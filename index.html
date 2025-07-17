@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grup PRG9999</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #1f1f1f;
+      padding: 10px;
+      text-align: center;
+      font-size: 1.5em;
+      color: gold;
+    }
+    #login, #register, #chat, #groupSettings {
+      display: none;
+      padding: 20px;
+    }
+    input, button, textarea {
+      padding: 10px;
+      margin: 5px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .message {
+      margin: 10px;
+      padding: 10px;
+      background: #333;
+      border-radius: 5px;
+      position: relative;
+    }
+    .message span.delete {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      cursor: pointer;
+      color: red;
+    }
+    .admin-controls {
+      margin-top: 10px;
+    }
+    .chat-media {
+      margin-top: 10px;
+    }
+    img.chat-img {
+      max-width: 100px;
+      display: block;
+      margin-top: 5px;
+    }
+    audio {
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <header>Grup PRG9999</header>
+
+  <div id="register">
+    <h3>Daftar Akun</h3>
+    <input id="regUser" placeholder="Nama Pengguna" />
+    <input id="regPass" placeholder="Kata Sandi" type="password" />
+    <button onclick="register()">Daftar</button>
+    <button onclick="showLogin()">Ke Login</button>
+  </div>
+
+  <div id="login">
+    <h3>Masuk Akun</h3>
+    <input id="loginUser" placeholder="Nama Pengguna" />
+    <input id="loginPass" placeholder="Kata Sandi" type="password" />
+    <button onclick="login()">Masuk</button>
+    <button onclick="showRegister()">Ke Daftar</button>
+  </div>
+
+  <div id="chat">
+    <h3>Halo, <span id="currentUser"></span></h3>
+    <div id="messages"></div>
+    <textarea id="messageInput" placeholder="Tulis pesan..."></textarea>
+    <input type="file" id="fileInput" accept="image/*,audio/*" />
+    <input type="text" id="linkInput" placeholder="Tambahkan link (opsional)" />
+    <button onclick="sendMessage()">Kirim</button>
+    <div class="admin-controls" id="groupSettings">
+      <input id="newGroup" placeholder="Nama Grup Baru" />
+      <button onclick="createGroup()">Buat Grup</button>
+      <input id="kickUser" placeholder="Nama User yang dikeluarkan" />
+      <button onclick="kickMember()">Keluarkan</button>
+    </div>
+    <button onclick="logout()">Keluar</button>
+  </div>
+
+  <script>
+    const ADMIN = "PRG9999";
+    const ADMIN_PASS = "PRG8000";
+    let currentUser = null;
+    let messages = [];
+    let users = JSON.parse(localStorage.getItem("users")) || {};
+
+    function showLogin() {
+      document.getElementById("register").style.display = "none";
+      document.getElementById("login").style.display = "block";
+    }
+
+    function showRegister() {
+      document.getElementById("login").style.display = "none";
+      document.getElementById("register").style.display = "block";
+    }
+
+    function register() {
+      const user = regUser.value;
+      const pass = regPass.value;
+      if (!user || !pass) return;
+
+      if (user === ADMIN && pass !== ADMIN_PASS) {
+        alert("Nama PRG9999 hanya bisa digunakan oleh admin resmi.");
+        return;
+      }
+
+      if (user in users) {
+        alert("Nama pengguna sudah terdaftar!");
+        return;
+      }
+
+      users[user] = pass;
+      localStorage.setItem("users", JSON.stringify(users));
+      alert("Pendaftaran berhasil!");
+      showLogin();
+    }
+
+    function login() {
+      const user = loginUser.value;
+      const pass = loginPass.value;
+      if (user === ADMIN && pass !== ADMIN_PASS) {
+        alert("Login admin gagal!");
+        return;
+      }
+      if (users[user] === pass || (user === ADMIN && pass === ADMIN_PASS)) {
+        currentUser = user;
+        document.getElementById("login").style.display = "none";
+        document.getElementById("chat").style.display = "block";
+        document.getElementById("currentUser").textContent = user;
+        if (user === ADMIN) document.getElementById("groupSettings").style.display = "block";
+        renderMessages();
+      } else {
+        alert("Login gagal!");
+      }
+    }
+
+    function logout() {
+      location.reload();
+    }
+
+    function sendMessage() {
+      const text = document.getElementById("messageInput").value;
+      const file = document.getElementById("fileInput").files[0];
+      const link = document.getElementById("linkInput").value;
+
+      let media = "";
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          if (file.type.startsWith("image")) {
+            media = `<img src="${e.target.result}" class="chat-img"/>`;
+          } else if (file.type.startsWith("audio")) {
+            media = `<audio controls src="${e.target.result}"></audio>`;
+          } else {
+            media = `<a href="${e.target.result}" download="${file.name}">Unduh File</a>`;
+          }
+          finalizeMessage(text, link, media);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        finalizeMessage(text, link, "");
+      }
+    }
+
+    function finalizeMessage(text, link, media) {
+      if (text || link || media) {
+        messages.push({ user: currentUser, text, link, media });
+        localStorage.setItem("messages", JSON.stringify(messages));
+        renderMessages();
+        document.getElementById("messageInput").value = "";
+        document.getElementById("fileInput").value = "";
+        document.getElementById("linkInput").value = "";
+      }
+    }
+
+    function renderMessages() {
+      messages = JSON.parse(localStorage.getItem("messages")) || [];
+      const msgBox = document.getElementById("messages");
+      msgBox.innerHTML = "";
+      messages.forEach((m, i) => {
+        const msg = document.createElement("div");
+        msg.className = "message";
+        msg.innerHTML = `<strong>${m.user}:</strong> ${m.text}<br>${m.link ? `<a href='${m.link}' target='_blank'>${m.link}</a>` : ""} ${m.media || ""}`;
+        if (m.user === currentUser || currentUser === ADMIN) {
+          const del = document.createElement("span");
+          del.className = "delete";
+          del.textContent = "×";
+          del.onclick = () => deleteMessage(i);
+          msg.appendChild(del);
+        }
+        msgBox.appendChild(msg);
+      });
+    }
+
+    function deleteMessage(index) {
+      messages.splice(index, 1);
+      localStorage.setItem("messages", JSON.stringify(messages));
+      renderMessages();
+    }
+
+    function createGroup() {
+      alert("Fitur grup aktif. Grup dibuat: " + document.getElementById("newGroup").value);
+    }
+
+    function kickMember() {
+      const kick = document.getElementById("kickUser").value;
+      if (kick in users && kick !== ADMIN) {
+        delete users[kick];
+        localStorage.setItem("users", JSON.stringify(users));
+        alert("User dikeluarkan: " + kick);
+      }
+    }
+
+    showLogin();
+  </script>
+</body>
+</html>
